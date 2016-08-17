@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.brainage.example.mapper.TestBookBackupMapper">
+
+    <insert id="insert" parameterType="net.brainage.example.model.TestBook">
+        INSERT INTO TEST_BOOK_BACKUP (BACKUP_ID, BOOK_ID, BOOK_NAME, ORIGIN_PRICE)
+        VALUES (TEST_BOOK_BACKUP_SEQ.NEXTVAL, #{bookId}, #{name}, #{originPrice})
+    </insert>
+
+    <insert id="insertBatch" parameterType="list">
+        INSERT INTO TEST_BOOK_BACKUP (BACKUP_ID, BOOK_ID, BOOK_NAME, ORIGIN_PRICE) VALUE
+        <foreach collection="list" item="book" separator=", ">
+        (TEST_BOOK_BACKUP_SEQ.NEXTVAL, #{book.bookId}, #{book.name}, #{book.originPrice})
+        </foreach>
+    </insert>
+
+</mapper>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="net.brainage.example.mapper.TestBookMapper">
+
+    <resultMap id="testBookResultMap" type="net.brainage.example.model.TestBook">
+        <result column="BOOK_ID" property="id" />
+        <result column="BOOK_NAME" property="name" />
+        <result column="ORIGIN_PRICE" property="originPrice" />
+        <result column="CREATED_ON" property="createdOn" />
+    </resultMap>
+
+    <select id="getAll" resultMap="testBookResultMap">
+        SELECT BOOK_ID, BOOK_NAME, ORIGIN_PRICE, CREATED_ON
+        FROM TEST_BOOK
+    </select>
+
+    <insert id="insert" parameterType="net.brainage.example.model.TestBook">
+        INSERT INTO TEST_BOOK (BOOK_ID, BOOK_NAME, ORIGIN_PRICE)
+        VALUES (TEST_BOOK_SEQ.NEXTVAL, #{name}, #{originPrice})
+    </insert>
+
+    <insert id="insertBatch" parameterType="list">
+        INSERT INTO TEST_BOOK (BOOK_ID, BOOK_NAME, ORIGIN_PRICE) VALUE
+        <foreach collection="list" item="book" separator=", ">
+        (TEST_BOOK_SEQ.NEXTVAL, #{book.name}, #{book.originPrice})
+        </foreach>
+    </insert>
+
+    <update id="update" parameterType="net.brainage.example.model.TestBook">
+        UPDATE TEST_BOOK
+           SET ORIGIN_PRICE = #{originPrice}
+         WHERE BOOK_ID = #{id}
+    </update>
+
+    <update id="updateBatch" parameterType="list">
+        UPDATE TEST_BOOK
+        SET ORIGIN_PRICE = #{originPrice}
+        WHERE BOOK_ID IN
+        <foreach collection="list" item="book" open="(" close=")" separator=", ">
+            #{book.id}
+        </foreach>
+    </update>
+
+</mapper>
