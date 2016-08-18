@@ -11,7 +11,7 @@
         <result column="CREATED_ON" property="createdOn" />
     </resultMap>
 
-    <select id="getAll" resultMap="testBookResultMap">
+    <select id="getAll" resultMap="testBookResultMap" fetchSize="100">
         SELECT BOOK_ID, BOOK_NAME, ORIGIN_PRICE, CREATED_ON
         FROM TEST_BOOK
     </select>

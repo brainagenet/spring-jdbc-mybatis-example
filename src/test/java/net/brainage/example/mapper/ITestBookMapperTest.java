@@ -1,29 +1,43 @@
 package net.brainage.example.mapper;
 
+import net.brainage.example.core.tx.TransactionImpl;
+import net.brainage.example.model.TestBook;
 import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.session.ResultContext;
+import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.transaction.TransactionConfiguration;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 
 import javax.sql.DataSource;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by ms29.seo on 2016-08-17.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration
+@TransactionConfiguration
 public class ITestBookMapperTest {
 
     @Configuration
-    @MapperScan(basePackages = {"net.brainage.example.mapper"})
+    @MapperScan(basePackages = {"net.brainage.example.mapper"}, sqlSessionTemplateRef = "sqlSessionTemplate")
     static class TestConfig {
 
         @Bean
@@ -38,23 +52,108 @@ public class ITestBookMapperTest {
         }
 
         @Bean
-        public SqlSessionFactory sessionFactory(DataSource dataSource) throws Exception {
+        public SqlSessionFactory sqlSessionFactory() throws Exception {
             SqlSessionFactoryBean ssfb = new SqlSessionFactoryBean();
-            ssfb.setDataSource(dataSource);
+            ssfb.setDataSource(dataSource());
             ssfb.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:mapper/*.xml"));
+            // ssfb.setPlugins();
             return ssfb.getObject();
         }
 
-        @Bean
-        public SqlSessionTemplate sqlSessionTemplate(SqlSessionFactory sqlSessionFactory) {
-            SqlSessionTemplate sqlSessionTemplate = new SqlSessionTemplate(sqlSessionFactory, ExecutorType.REUSE);
+        @Bean(name = "sqlSessionTemplate")
+        public SqlSessionTemplate sqlSessionTemplate() throws Exception {
+            SqlSessionTemplate sqlSessionTemplate = new SqlSessionTemplate(sqlSessionFactory(), ExecutorType.REUSE);
             return sqlSessionTemplate;
         }
 
         @Bean
-        public SqlSessionTemplate batchSqlSessionTemplate(SqlSessionFactory sqlSessionFactory) {
-            SqlSessionTemplate sqlSessionTemplate = new SqlSessionTemplate(sqlSessionFactory, ExecutorType.BATCH);
+        public SqlSessionTemplate batchSqlSessionTemplate() throws Exception {
+            SqlSessionTemplate sqlSessionTemplate = new SqlSessionTemplate(sqlSessionFactory(), ExecutorType.BATCH);
             return sqlSessionTemplate;
+        }
+
+        @Bean
+        public SqlMapMapper sqlMapMapper(@Qualifier("sqlSessionTemplate") SqlSessionTemplate sqlSessionTemplate) throws Exception {
+            SqlMapMapper sqlMapMapper = new SqlMapMapper();
+            sqlMapMapper.setSqlSessionTemplate(sqlSessionTemplate());
+            return sqlMapMapper;
+        }
+
+        @Bean
+        public PlatformTransactionManager transactionManager(DataSource dataSource) {
+            DataSourceTransactionManager dataSourceTransactionManager = new DataSourceTransactionManager(dataSource);
+            return dataSourceTransactionManager;
+        }
+
+    }
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
+
+    @Autowired
+    SqlMapMapper sqlMapMapper;
+
+    @Autowired
+    TestBookBackupMapper testBookBackupMapper;
+
+    @Test
+    public void test_for_backup_book() {
+
+        final TransactionImpl transaction = new TransactionImpl(transactionManager);
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
+        transaction.setReadOnly(false);
+
+        try {
+            transaction.start();
+
+            final List<TestBook> books = new ArrayList<TestBook>();
+
+            sqlMapMapper.select("net.brainage.example.mapper.TestBookMapper.getAll", new ResultHandler() {
+                @Override
+                public void handleResult(ResultContext resultContext) {
+                    TestBook book = (TestBook) resultContext.getResultObject();
+                    books.add(book);
+
+                    if (books.size() == 100) {
+                        testBookBackupMapper.insertBatch(books);
+                        books.clear();
+                    }
+                }
+            });
+
+            if (books.size() > 0 ) {
+                testBookBackupMapper.insertBatch(books);
+                books.clear();
+            }
+
+            transaction.rollback();
+        } finally {
+            transaction.end();
+        }
+
+    }
+
+    @Test
+    public void test_for_backup_book() {
+
+        final TransactionImpl transaction = new TransactionImpl(transactionManager);
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
+        transaction.setReadOnly(false);
+
+        try {
+            transaction.start();
+            sqlMapMapper.select("net.brainage.example.mapper.TestBookMapper.getAll", new ResultHandler() {
+                @Override
+                public void handleResult(ResultContext resultContext) {
+                    TestBook book = (TestBook) resultContext.getResultObject();
+                    testBookBackupMapper.insert(book);
+                }
+            });
+            transaction.rollback();
+        } finally {
+            transaction.end();
         }
 
     }
