@@ -4,9 +4,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 
-/**
- * Created by ms29.seo on 2016-08-18.
- */
 public class TransactionImpl implements Transaction {
 
     private final PlatformTransactionManager transactionManager;
@@ -55,4 +52,5 @@ public class TransactionImpl implements Transaction {
     public void end() {
         rollback();
     }
+
 }

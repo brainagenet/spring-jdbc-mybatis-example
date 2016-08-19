@@ -28,7 +28,7 @@
         </foreach>
     </insert>
 
-    <update id="update" parameterType="net.brainage.example.model.TestBook">
+    <update id="updateOriginPrice" parameterType="net.brainage.example.model.TestBook">
         UPDATE TEST_BOOK
            SET ORIGIN_PRICE = #{originPrice}
          WHERE BOOK_ID = #{id}

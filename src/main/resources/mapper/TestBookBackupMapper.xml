@@ -18,4 +18,10 @@
         SELECT * FROM DUAL
     </insert>
 
+    <update id="update" parameterType="net.brainage.example.model.TestBook">
+        UPDATE TEST_BOOK_BACKUP
+          SET ORIGIN_PRICE = 0
+        WHERE BOOK_ID = #{id}
+    </update>
+
 </mapper>

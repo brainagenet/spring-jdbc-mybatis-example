@@ -1,5 +1,6 @@
 package net.brainage.example.mapper;
 
+import net.brainage.example.core.tx.Transaction;
 import net.brainage.example.core.tx.TransactionImpl;
 import net.brainage.example.model.TestBook;
 import org.apache.ibatis.session.ExecutorType;
@@ -25,7 +26,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 
 import javax.sql.DataSource;
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Formatter;
 import java.util.List;
 
 /**
@@ -85,6 +88,14 @@ public class ITestBookMapperTest {
             return dataSourceTransactionManager;
         }
 
+
+        @Bean
+        public SqlMapMapper batchSqlMapMapper(@Qualifier("batchSqlSessionTemplate") SqlSessionTemplate batchSqlSessionTemplate) {
+            SqlMapMapper sqlMapMapper = new SqlMapMapper();
+            sqlMapMapper.setSqlSessionTemplate(batchSqlSessionTemplate);
+            return sqlMapMapper;
+        }
+
     }
 
     @Autowired
@@ -96,13 +107,25 @@ public class ITestBookMapperTest {
     @Autowired
     TestBookBackupMapper testBookBackupMapper;
 
+    @Autowired
+    @Qualifier("batchSqlMapMapper")
+    SqlMapMapper batchSqlMapMapper;
+
     @Test
     public void test_for_backup_book() {
 
+        final Transaction transaction = Transaction.Builder.of(transactionManager)
+                .propagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED)
+                .isolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED)
+                .readOnly(false)
+                .build();
+
+        /*
         final TransactionImpl transaction = new TransactionImpl(transactionManager);
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
         transaction.setReadOnly(false);
+        */
 
         try {
             transaction.start();
@@ -122,7 +145,7 @@ public class ITestBookMapperTest {
                 }
             });
 
-            if (books.size() > 0 ) {
+            if (books.size() > 0) {
                 testBookBackupMapper.insertBatch(books);
                 books.clear();
             }
@@ -134,28 +157,79 @@ public class ITestBookMapperTest {
 
     }
 
-    @Test
-    public void test_for_backup_book() {
 
-        final TransactionImpl transaction = new TransactionImpl(transactionManager);
-        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
-        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
-        transaction.setReadOnly(false);
+    @Test
+    public void test_for_bulk_update_with_batch_mode() {
+
+        final Transaction transaction = Transaction.Builder.of(transactionManager)
+                .propagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED)
+                .isolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED)
+                .readOnly(false)
+                .build();
 
         try {
             transaction.start();
-            sqlMapMapper.select("net.brainage.example.mapper.TestBookMapper.getAll", new ResultHandler() {
+
+            batchSqlMapMapper.select("net.brainage.example.mapper.TestBookMapper.getAll", new ResultHandler() {
                 @Override
                 public void handleResult(ResultContext resultContext) {
                     TestBook book = (TestBook) resultContext.getResultObject();
-                    testBookBackupMapper.insert(book);
+
+                    TestBook newBook = new TestBook();
+                    newBook.setId(book.getId());
+
+
+                    newBook.setOriginPrice(book.getOriginPrice() + (book.getOriginPrice() * ((resultContext.getResultCount() % 5) / 100)));
+
+                    batchSqlMapMapper.update("net.brainage.example.mapper.TestBookMapper.updateOriginPrice", newBook);
+                    if (resultContext.getResultCount() % 100 == 0) {
+                        batchSqlMapMapper.getSqlSession().flushStatements();
+                    }
+                    if (resultContext.isStopped()) {
+                        batchSqlMapMapper.getSqlSession().flushStatements();
+                    }
                 }
             });
-            transaction.rollback();
+
+            transaction.commit();
         } finally {
             transaction.end();
         }
 
+    }
+
+//    @Test
+//    public void test_for_backup_book() {
+//
+//        final TransactionImpl transaction = new TransactionImpl(transactionManager);
+//        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+//        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
+//        transaction.setReadOnly(false);
+//
+//        try {
+//            transaction.start();
+//            sqlMapMapper.select("net.brainage.example.mapper.TestBookMapper.getAll", new ResultHandler() {
+//                @Override
+//                public void handleResult(ResultContext resultContext) {
+//                    TestBook book = (TestBook) resultContext.getResultObject();
+//                    testBookBackupMapper.insert(book);
+//                }
+//            });
+//            transaction.rollback();
+//        } finally {
+//            transaction.end();
+//        }
+//    }
+
+    @Test
+    public void some() {
+        BigDecimal price = new BigDecimal(10000);
+        BigDecimal discount = price.multiply(new BigDecimal((3 % 5) / 100));
+        BigDecimal newPrice = price.subtract(discount);
+
+        System.out.println(">>>>>> " + (3 % 5));
+
+        System.out.println(price + " / " + discount + " / " + newPrice);
     }
 
 }
